@@ -1,29 +1,16 @@
-# whatsapp-ai-bot
+# React + Vite
 
-📲 Want to automate WhatsApp replies with AI? In this video, I’ll show you how to connect your personal WhatsApp to AI using n8n and whatsapp-web.js—without needing the official WhatsApp Business API!
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-🔹 Why use this?
-✅ Automate WhatsApp responses
-✅ Connect AI chatbots to WhatsApp
-✅ Enhance personal and business communication
+Currently, two official plugins are available:
 
-**Check Below Video from YouTube :**
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-[![Youtube Video](https://img.youtube.com/vi/YO09q0rP0Yw/0.jpg)](https://www.youtube.com/watch?v=YO09q0rP0Yw)
+## React Compiler
 
-🚀 What’s covered in this video?
-00:00 - Intro
-00:24 - Live Demo (AI-powered WhatsApp replies)
-01:45 - How It works
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
+## Expanding the ESLint configuration
 
-⚠️ DISCLAIMER: This is an unofficial method. WhatsApp may block your number if you misuse automation. DO NOT SPAM or violate WhatsApp policies. Use responsibly!
-
-💬 Have questions? Let me know in the comments!
-🔥 Like, Subscribe & Hit the Bell 🔔 for more automation and AI videos!
-
-#WhatsAppAutomation #AIChatbot #n8n #whatsappwebjs #TechTutorial
-
-For Support : Enquiries : Working Together: Queries : Connect us On 
-https://wa.me/919423177880 , https://wa.me/917057758867
-Website : yohita.com
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
