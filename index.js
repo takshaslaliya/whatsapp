@@ -49,8 +49,11 @@ const client = new Client({
   // Use takeover to prevent auto-logout
   takeoverOnConflict: false,
   takeoverTimeoutMs: 0,
-  // Let it auto-detect WhatsApp Web version
-  // webVersionCache removed to avoid version detection errors
+  // Use remote version cache to avoid detection errors
+  webVersionCache: {
+    type: 'remote',
+    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2413.51.html',
+  },
 });
 
 const stripJid = (jid) => (jid ? jid.replace(/@.+$/, "") : jid);
@@ -109,15 +112,18 @@ client.on("ready", async () => {
 client.on("disconnected", (reason) => {
   console.log("Client disconnected:", reason);
   
+  // Reset retry count on disconnect
+  retryCount = 0;
+  
   // If logged out, need to re-scan QR code
   if (reason === "LOGOUT") {
     console.log("Logged out - WhatsApp may have detected automation");
     console.log("A new QR code will be generated. Please scan it again.");
-    // Wait a bit longer before reinitializing to avoid rapid reconnection
+    // Wait longer before reinitializing to avoid rapid reconnection and give time for cleanup
     setTimeout(() => {
-      console.log("Reinitializing after logout...");
+      console.log("Reinitializing after logout (waiting for WhatsApp Web to be ready)...");
       initializeClient();
-    }, 10000);
+    }, 15000); // Increased wait time
     return;
   }
   
@@ -187,26 +193,38 @@ const initializeClient = async () => {
   isInitializing = true;
   try {
     console.log(`Initializing WhatsApp client (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+    
+    // Add a small delay before initialization to ensure previous session is cleaned up
+    if (retryCount > 0) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+    
     await client.initialize();
     retryCount = 0; // Reset on success
     isInitializing = false;
+    console.log("Initialization successful!");
   } catch (error) {
     isInitializing = false;
     retryCount++;
-    console.error("Failed to initialize client:", error.message);
+    const errorMsg = error?.message || String(error);
+    console.error("Failed to initialize client:", errorMsg);
     
-    // Don't log full error stack in production to avoid clutter
-    if (error.message.includes("VERSION")) {
-      console.error("Version detection error - this may resolve on retry");
+    // Handle specific error types
+    if (errorMsg.includes("VERSION") || errorMsg.includes("Execution context")) {
+      console.error("Version detection error - WhatsApp Web may not be fully loaded yet");
+      console.error("This often happens on cloud platforms. Will retry with longer delay...");
     }
     
     if (retryCount >= MAX_RETRIES) {
       console.error("Max retries reached. The bot will stay stopped.");
-      console.error("Please check Render logs and restart the service if needed.");
+      console.error("This is often due to WhatsApp detecting automation on cloud platforms.");
+      console.error("Consider using a VPS or upgrading to Render paid plan for better compatibility.");
       return; // Don't exit, let the HTTP server keep running
     }
     
-    const waitTime = Math.min(15000 * retryCount, 45000); // Exponential backoff, max 45s
+    // Longer wait time for version errors
+    const baseWaitTime = errorMsg.includes("VERSION") ? 30000 : 15000;
+    const waitTime = Math.min(baseWaitTime * retryCount, 60000); // Max 60s
     console.log(`Retrying in ${waitTime / 1000} seconds...`);
     setTimeout(() => {
       initializeClient();
@@ -216,7 +234,19 @@ const initializeClient = async () => {
 
 // Add process error handlers
 process.on('unhandledRejection', (error) => {
-  console.error('Unhandled promise rejection:', error.message);
+  const errorMsg = error?.message || String(error);
+  console.error('Unhandled promise rejection:', errorMsg);
+  
+  // If it's a version error, try to reinitialize after a delay
+  if (errorMsg.includes('VERSION') || errorMsg.includes('Execution context')) {
+    console.log('Version detection error detected. Will retry initialization...');
+    setTimeout(() => {
+      if (!isInitializing) {
+        retryCount = 0; // Reset retry count for version errors
+        initializeClient();
+      }
+    }, 20000); // Wait 20 seconds before retry
+  }
   // Don't crash on unhandled rejections, let the bot continue
 });
 
