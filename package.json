@@ -4,7 +4,8 @@
   "author": "Amit Kulkarni",
   "homepage": "https://yohita.com/",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "postinstall": "echo 'Build complete'"
   },
   "dependencies": {
     "axios": "^1.8.1",

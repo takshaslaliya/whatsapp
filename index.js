@@ -14,20 +14,26 @@ const client = new Client({
       '--no-first-run',
       '--no-zygote',
       '--single-process',
-      '--disable-gpu'
+      '--disable-gpu',
+      '--disable-web-security',
+      '--disable-features=IsolateOrigins,site-per-process'
     ],
-    timeout: 60000,
+    timeout: 120000,
+    ignoreHTTPSErrors: true,
   },
-  webVersionCache: {
-    type: 'remote',
-    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2413.51.html',
-  },
+  // Remove webVersionCache to let it auto-detect
+  // This prevents version detection errors
 });
 
 const stripJid = (jid) => (jid ? jid.replace(/@.+$/, "") : jid);
 
 client.on("qr", (qr) => {
+  console.log("QR Code generated - scan with WhatsApp");
   qrcode.generate(qr, { small: true });
+});
+
+client.on("loading_screen", (percent, message) => {
+  console.log(`Loading: ${percent}% - ${message}`);
 });
 
 client.on("ready", () => {
@@ -83,15 +89,39 @@ client.on("message_create", async (msg) => {
 });
 
 // Initialize with error handling and retry logic
+let retryCount = 0;
+const MAX_RETRIES = 5;
+
 const initializeClient = async () => {
   try {
+    console.log(`Initializing WhatsApp client (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
     await client.initialize();
+    retryCount = 0; // Reset on success
   } catch (error) {
+    retryCount++;
     console.error("Failed to initialize client:", error.message);
-    console.log("Retrying in 10 seconds...");
-    setTimeout(initializeClient, 10000);
+    console.error("Full error:", error);
+    
+    if (retryCount >= MAX_RETRIES) {
+      console.error("Max retries reached. Please check your configuration.");
+      process.exit(1);
+    }
+    
+    const waitTime = Math.min(10000 * retryCount, 30000); // Exponential backoff, max 30s
+    console.log(`Retrying in ${waitTime / 1000} seconds...`);
+    setTimeout(initializeClient, waitTime);
   }
 };
+
+// Add process error handlers
+process.on('unhandledRejection', (error) => {
+  console.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error);
+  // Don't exit, let the retry logic handle it
+});
 
 initializeClient();
 

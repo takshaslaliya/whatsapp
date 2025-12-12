@@ -7,9 +7,9 @@ services:
     startCommand: npm start
     envVars:
       - key: NODE_VERSION
-        value: 18.x
+        value: 20.x
+      - key: DISPLAY
+        value: ":99"
       - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
         value: "false"
-      - key: PUPPETEER_EXECUTABLE_PATH
-        value: ""
 
