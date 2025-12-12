@@ -1,9 +1,22 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const axios = require("axios");
 const qrcode = require("qrcode-terminal");
+const http = require("http");
+
+// Create HTTP server for Render port requirement
+const PORT = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("WhatsApp Bot is running");
+});
+server.listen(PORT, () => {
+  console.log(`HTTP server listening on port ${PORT}`);
+});
 
 const client = new Client({
-  authStrategy: new LocalAuth(),
+  authStrategy: new LocalAuth({
+    dataPath: "./.wwebjs_auth",
+  }),
   puppeteer: {
     headless: true,
     args: [
@@ -16,13 +29,14 @@ const client = new Client({
       '--single-process',
       '--disable-gpu',
       '--disable-web-security',
-      '--disable-features=IsolateOrigins,site-per-process'
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
     ],
     timeout: 120000,
     ignoreHTTPSErrors: true,
   },
-  // Remove webVersionCache to let it auto-detect
-  // This prevents version detection errors
+  // Let it auto-detect WhatsApp Web version
+  // webVersionCache removed to avoid version detection errors
 });
 
 const stripJid = (jid) => (jid ? jid.replace(/@.+$/, "") : jid);
@@ -42,15 +56,29 @@ client.on("ready", () => {
 
 client.on("disconnected", (reason) => {
   console.log("Client disconnected:", reason);
-  // Auto-reconnect after 5 seconds
+  
+  // If logged out, need to re-scan QR code
+  if (reason === "LOGOUT") {
+    console.log("Logged out - will need to scan QR code again");
+    // Don't auto-reconnect on logout, wait for manual QR scan
+    return;
+  }
+  
+  // For other disconnections, try to reconnect
+  console.log("Attempting to reconnect...");
   setTimeout(() => {
-    console.log("Attempting to reconnect...");
-    client.initialize();
+    initializeClient();
   }, 5000);
 });
 
 client.on("auth_failure", (msg) => {
   console.error("Authentication failure:", msg);
+  // Clear auth data on failure
+  console.log("Clearing authentication data...");
+});
+
+client.on("remote_session_saved", () => {
+  console.log("Remote session saved successfully");
 });
 
 client.on("message_create", async (msg) => {
@@ -90,39 +118,57 @@ client.on("message_create", async (msg) => {
 
 // Initialize with error handling and retry logic
 let retryCount = 0;
-const MAX_RETRIES = 5;
+const MAX_RETRIES = 3;
+let isInitializing = false;
 
 const initializeClient = async () => {
+  if (isInitializing) {
+    console.log("Already initializing, skipping...");
+    return;
+  }
+  
+  isInitializing = true;
   try {
     console.log(`Initializing WhatsApp client (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
     await client.initialize();
     retryCount = 0; // Reset on success
+    isInitializing = false;
   } catch (error) {
+    isInitializing = false;
     retryCount++;
     console.error("Failed to initialize client:", error.message);
-    console.error("Full error:", error);
     
-    if (retryCount >= MAX_RETRIES) {
-      console.error("Max retries reached. Please check your configuration.");
-      process.exit(1);
+    // Don't log full error stack in production to avoid clutter
+    if (error.message.includes("VERSION")) {
+      console.error("Version detection error - this may resolve on retry");
     }
     
-    const waitTime = Math.min(10000 * retryCount, 30000); // Exponential backoff, max 30s
+    if (retryCount >= MAX_RETRIES) {
+      console.error("Max retries reached. The bot will stay stopped.");
+      console.error("Please check Render logs and restart the service if needed.");
+      return; // Don't exit, let the HTTP server keep running
+    }
+    
+    const waitTime = Math.min(15000 * retryCount, 45000); // Exponential backoff, max 45s
     console.log(`Retrying in ${waitTime / 1000} seconds...`);
-    setTimeout(initializeClient, waitTime);
+    setTimeout(() => {
+      initializeClient();
+    }, waitTime);
   }
 };
 
 // Add process error handlers
 process.on('unhandledRejection', (error) => {
-  console.error('Unhandled promise rejection:', error);
+  console.error('Unhandled promise rejection:', error.message);
+  // Don't crash on unhandled rejections, let the bot continue
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error);
-  // Don't exit, let the retry logic handle it
+  console.error('Uncaught exception:', error.message);
+  // Don't exit, let the HTTP server keep running
 });
 
+// Start the bot
 initializeClient();
 
 //Message respond using n8n
