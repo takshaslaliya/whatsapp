@@ -4,6 +4,24 @@ const qrcode = require("qrcode-terminal");
 
 const client = new Client({
   authStrategy: new LocalAuth(),
+  puppeteer: {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu'
+    ],
+    timeout: 60000,
+  },
+  webVersionCache: {
+    type: 'remote',
+    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2413.51.html',
+  },
 });
 
 const stripJid = (jid) => (jid ? jid.replace(/@.+$/, "") : jid);
@@ -14,6 +32,19 @@ client.on("qr", (qr) => {
 
 client.on("ready", () => {
   console.log("Client is ready!");
+});
+
+client.on("disconnected", (reason) => {
+  console.log("Client disconnected:", reason);
+  // Auto-reconnect after 5 seconds
+  setTimeout(() => {
+    console.log("Attempting to reconnect...");
+    client.initialize();
+  }, 5000);
+});
+
+client.on("auth_failure", (msg) => {
+  console.error("Authentication failure:", msg);
 });
 
 client.on("message_create", async (msg) => {
@@ -51,7 +82,18 @@ client.on("message_create", async (msg) => {
   }
 });
 
-client.initialize();
+// Initialize with error handling and retry logic
+const initializeClient = async () => {
+  try {
+    await client.initialize();
+  } catch (error) {
+    console.error("Failed to initialize client:", error.message);
+    console.log("Retrying in 10 seconds...");
+    setTimeout(initializeClient, 10000);
+  }
+};
+
+initializeClient();
 
 //Message respond using n8n
 respond_to_message = async (msg) => {
