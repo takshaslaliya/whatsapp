@@ -30,11 +30,25 @@ const client = new Client({
       '--disable-gpu',
       '--disable-web-security',
       '--disable-features=IsolateOrigins,site-per-process',
-      '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      '--window-size=1920,1080',
+      '--start-maximized',
+      '--disable-blink-features=AutomationControlled',
+      '--exclude-switches=enable-automation',
+      '--disable-extensions-except',
+      '--disable-plugins-discovery',
+      '--disable-default-apps'
     ],
     timeout: 120000,
     ignoreHTTPSErrors: true,
+    defaultViewport: {
+      width: 1920,
+      height: 1080,
+    },
   },
+  // Use takeover to prevent auto-logout
+  takeoverOnConflict: false,
+  takeoverTimeoutMs: 0,
   // Let it auto-detect WhatsApp Web version
   // webVersionCache removed to avoid version detection errors
 });
@@ -50,8 +64,46 @@ client.on("loading_screen", (percent, message) => {
   console.log(`Loading: ${percent}% - ${message}`);
 });
 
-client.on("ready", () => {
+client.on("ready", async () => {
   console.log("Client is ready!");
+  console.log("Bot is connected and ready to receive messages");
+  
+  // Add stealth script to hide automation (if page is accessible)
+  try {
+    // Wait a bit for page to be ready
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    if (client.pupPage) {
+      const page = await client.pupPage();
+      if (page) {
+        await page.evaluateOnNewDocument(() => {
+          // Hide webdriver property
+          Object.defineProperty(navigator, 'webdriver', {
+            get: () => false,
+          });
+          
+          // Override plugins
+          Object.defineProperty(navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5],
+          });
+          
+          // Override languages
+          Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en'],
+          });
+          
+          // Mock chrome object
+          window.chrome = {
+            runtime: {},
+          };
+        });
+        console.log("Stealth scripts injected successfully");
+      }
+    }
+  } catch (err) {
+    // Silently fail - stealth injection is optional
+    console.log("Note: Could not inject stealth scripts (this is usually fine)");
+  }
 });
 
 client.on("disconnected", (reason) => {
@@ -59,8 +111,13 @@ client.on("disconnected", (reason) => {
   
   // If logged out, need to re-scan QR code
   if (reason === "LOGOUT") {
-    console.log("Logged out - will need to scan QR code again");
-    // Don't auto-reconnect on logout, wait for manual QR scan
+    console.log("Logged out - WhatsApp may have detected automation");
+    console.log("A new QR code will be generated. Please scan it again.");
+    // Wait a bit longer before reinitializing to avoid rapid reconnection
+    setTimeout(() => {
+      console.log("Reinitializing after logout...");
+      initializeClient();
+    }, 10000);
     return;
   }
   
