@@ -1,0 +1,43 @@
+2025/12/21-22:19:01.528 437d Reusing MANIFEST /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/12/21-22:19:01.528 437d Recovering log #2160
+2025/12/21-22:19:01.576 437d Reusing old log /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/IndexedDB/https_web.whatsapp.com_0.indexeddb.leveldb/002160.log 
+2025/12/21-22:19:03.966 43b2 Level-0 table #2182: started
+2025/12/21-22:19:03.979 43b2 Level-0 table #2182: 599326 bytes OK
+2025/12/21-22:19:03.980 43b2 Delete type=0 #2160
+2025/12/21-22:19:03.981 43b2 Manual compaction at level-0 from '\x00-\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00.\x00\x00\x00' @ 0 : 0; will stop at '\x00-\x00\x00\x05' @ 5704061 : 1
+2025/12/21-22:19:03.981 43b2 Compacting 1@0 + 0@1 files
+2025/12/21-22:19:03.995 43b2 Generated table #2183@0: 15468 keys, 286380 bytes
+2025/12/21-22:19:03.996 43b2 Generated table #2184@0: 109 keys, 9636 bytes
+2025/12/21-22:19:03.996 43b2 Compacted 1@0 + 0@1 files => 296016 bytes
+2025/12/21-22:19:03.997 43b2 compacted to: files[ 0 2 22 0 0 0 0 ]
+2025/12/21-22:19:03.997 43b2 Delete type=2 #2182
+2025/12/21-22:19:03.997 43b2 Manual compaction at level-0 from '\x00-\x00\x00\x05' @ 5704061 : 1 .. '\x00.\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/12/21-22:19:04.177 436a Compacting 1@1 + 5@2 files
+2025/12/21-22:19:04.265 436a Generated table #2185@1: 90365 keys, 2242125 bytes
+2025/12/21-22:19:04.326 436a Generated table #2186@1: 48261 keys, 2219450 bytes
+2025/12/21-22:19:04.371 436a Generated table #2187@1: 46621 keys, 2201704 bytes
+2025/12/21-22:19:04.429 436a Generated table #2188@1: 61407 keys, 2230578 bytes
+2025/12/21-22:19:04.466 436a Generated table #2189@1: 32339 keys, 2191884 bytes
+2025/12/21-22:19:04.467 436a Generated table #2190@1: 78 keys, 77908 bytes
+2025/12/21-22:19:04.467 436a Compacted 1@1 + 5@2 files => 11163649 bytes
+2025/12/21-22:19:04.468 436a compacted to: files[ 0 1 23 0 0 0 0 ]
+2025/12/21-22:19:04.469 436a Delete type=2 #2174
+2025/12/21-22:19:04.469 436a Delete type=2 #2173
+2025/12/21-22:19:04.469 436a Delete type=2 #2172
+2025/12/21-22:19:04.469 436a Delete type=2 #2183
+2025/12/21-22:19:04.469 436a Delete type=2 #2171
+2025/12/21-22:19:04.469 436a Delete type=2 #2170
+2025/12/21-22:19:04.564 43a7 Compacting 1@1 + 5@2 files
+2025/12/21-22:19:04.606 43a7 Generated table #2191@1: 29677 keys, 2194312 bytes
+2025/12/21-22:19:04.641 43a7 Generated table #2192@1: 40978 keys, 2174061 bytes
+2025/12/21-22:19:04.704 43a7 Generated table #2193@1: 100439 keys, 2251471 bytes
+2025/12/21-22:19:04.768 43a7 Generated table #2194@1: 100179 keys, 2249892 bytes
+2025/12/21-22:19:04.806 43a7 Generated table #2195@1: 67861 keys, 1550663 bytes
+2025/12/21-22:19:04.806 43a7 Compacted 1@1 + 5@2 files => 10420399 bytes
+2025/12/21-22:19:04.806 43a7 compacted to: files[ 0 0 23 0 0 0 0 ]
+2025/12/21-22:19:04.807 43a7 Delete type=2 #2167
+2025/12/21-22:19:04.807 43a7 Delete type=2 #2165
+2025/12/21-22:19:04.807 43a7 Delete type=2 #2166
+2025/12/21-22:19:04.807 43a7 Delete type=2 #2169
+2025/12/21-22:19:04.807 43a7 Delete type=2 #2184
+2025/12/21-22:19:04.807 43a7 Delete type=2 #2168
