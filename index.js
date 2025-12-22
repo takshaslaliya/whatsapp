@@ -756,11 +756,19 @@ client.on("message_create", async (msg) => {
 
     // This is a direct admin message (not from API, not a bot response)
     console.log("Forwarding direct admin message to API");
+
+    // Manual fix for specific LID (Admin sending TO this user)
+    let recipientId = stripJid(msg.to);
+    if (recipientId === '122569810260158') {
+      recipientId = '918708577598';
+      console.log(`Manually replaced recipient LID ${msg.to} with ${recipientId}`);
+    }
+
     try {
       await axios.post("http://72.60.97.177:5678/webhook/admin-message", {
         msg: msg.body,
         from: stripJid(msg.from),
-        to: stripJid(msg.to),
+        to: recipientId,
         from_name: msg._data?.notifyName,
         direction: "outbound",
       });
@@ -791,15 +799,19 @@ client.on("message_create", async (msg) => {
       console.log(`Manually replaced LID ${msg.to} with ${recipientId}`);
     }
 
+    const payload = {
+      msg: msg.body,
+      from: senderNumber,
+      to: recipientId,
+      from_name: msg._data?.notifyName,
+      direction: "inbound",
+    };
+
+    console.log("Forwarding user message payload:", JSON.stringify(payload, null, 2));
+
     // Forward all user messages to the API
     try {
-      await axios.post("http://72.60.97.177:5678/webhook/custom_wa_bot", {
-        msg: msg.body,
-        from: senderNumber,
-        to: recipientId,
-        from_name: msg._data?.notifyName,
-        direction: "inbound",
-      });
+      await axios.post("http://72.60.97.177:5678/webhook/custom_wa_bot", payload);
       console.log("User message forwarded to API");
     } catch (err) {
       console.error("Failed to forward user message to API", err.message);
