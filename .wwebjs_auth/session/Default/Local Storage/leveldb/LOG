@@ -1,3 +1,2 @@
-2025/12/22-18:40:30.383 13569 Reusing MANIFEST /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001
-2025/12/22-18:40:30.384 13569 Recovering log #4
-2025/12/22-18:40:30.385 13569 Reusing old log /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/Local Storage/leveldb/000004.log 
+2025/12/22-18:59:54.094 14506 Creating DB /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/Local Storage/leveldb since it was missing.
+2025/12/22-18:59:54.098 14506 Reusing MANIFEST /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/Local Storage/leveldb/MANIFEST-000001

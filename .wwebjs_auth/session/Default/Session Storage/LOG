@@ -1,3 +1,2 @@
-2025/12/22-18:40:31.534 1358a Reusing MANIFEST /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/Session Storage/MANIFEST-000001
-2025/12/22-18:40:31.534 1358a Recovering log #3
-2025/12/22-18:40:31.535 1358a Reusing old log /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/Session Storage/000003.log 
+2025/12/22-18:59:55.807 14504 Creating DB /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/Session Storage since it was missing.
+2025/12/22-18:59:55.811 14504 Reusing MANIFEST /home/taksh/Downloads/whatsapp-ai-bot-main/.wwebjs_auth/session/Default/Session Storage/MANIFEST-000001
