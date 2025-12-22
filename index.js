@@ -758,20 +758,24 @@ client.on("message_create", async (msg) => {
     console.log("Forwarding direct admin message to API");
 
     // Manual fix for specific LID (Admin sending TO this user)
-    let recipientId = stripJid(msg.to);
-    if (recipientId === '122569810260158') {
-      recipientId = '918708577598';
-      console.log(`Manually replaced recipient LID ${msg.to} with ${recipientId}`);
+    let finalRecipientId = stripJid(msg.to);
+    if (finalRecipientId === '122569810260158') {
+      finalRecipientId = '918708577598';
+      console.log(`Manually replaced recipient LID ${msg.to} with ${finalRecipientId}`);
     }
 
+    const payload = {
+      msg: msg.body,
+      from: stripJid(msg.from),
+      to: finalRecipientId,
+      from_name: msg._data?.notifyName,
+      direction: "outbound",
+    };
+
+    console.log("Forwarding direct admin message payload:", JSON.stringify(payload, null, 2));
+
     try {
-      await axios.post("http://72.60.97.177:5678/webhook/admin-message", {
-        msg: msg.body,
-        from: stripJid(msg.from),
-        to: recipientId,
-        from_name: msg._data?.notifyName,
-        direction: "outbound",
-      });
+      await axios.post("http://72.60.97.177:5678/webhook/admin-message", payload);
       console.log("Direct admin message forwarded to API");
     } catch (err) {
       console.error("Failed to forward direct admin message", err.message);
