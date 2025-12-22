@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require("whatsapp-web.js");
+const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
 const axios = require("axios");
 const qrcode = require("qrcode-terminal");
 const http = require("http");
@@ -17,7 +17,7 @@ const server = http.createServer(async (req, res) => {
   const clientIP = req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} from ${clientIP}`);
   console.log(`Headers:`, JSON.stringify(req.headers, null, 2));
-  
+
   // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -45,8 +45,8 @@ const server = http.createServer(async (req, res) => {
   // Health check endpoint
   if (pathname === '/' && req.method === 'GET') {
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ 
-      status: "running", 
+    res.end(JSON.stringify({
+      status: "running",
       message: "WhatsApp Bot is running",
       timestamp: new Date().toISOString(),
       endpoints: {
@@ -62,7 +62,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/test' && req.method === 'GET') {
     console.log('Test endpoint hit');
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ 
+    res.end(JSON.stringify({
       success: true,
       message: "Server is reachable",
       timestamp: new Date().toISOString(),
@@ -75,31 +75,31 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/send-message' && req.method === 'POST') {
     console.log('POST /send-message request received');
     let body = '';
-    
+
     req.on('data', chunk => {
       body += chunk.toString();
       console.log('Received chunk, body length:', body.length);
     });
-    
+
     req.on('error', (err) => {
       console.error('Request error:', err);
       res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ 
-        success: false, 
-        error: `Request error: ${err.message}` 
+      res.end(JSON.stringify({
+        success: false,
+        error: `Request error: ${err.message}`
       }));
     });
-    
+
     req.on('end', async () => {
       console.log('Request body received, length:', body.length);
       console.log('Request body content:', body);
-      
+
       try {
         let data;
         if (!body || body.trim() === '') {
           throw new Error('Empty request body');
         }
-        
+
         try {
           data = JSON.parse(body);
         } catch (parseErr) {
@@ -107,16 +107,16 @@ const server = http.createServer(async (req, res) => {
           console.error('Body that failed to parse:', body);
           throw new Error(`Invalid JSON: ${parseErr.message}`);
         }
-        
+
         console.log('Parsed data:', JSON.stringify(data, null, 2));
         const { number, message } = data;
 
         // Validate input
         if (!number || !message) {
           res.writeHead(400, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ 
-            success: false, 
-            error: "Missing required fields: 'number' and 'message' are required" 
+          res.end(JSON.stringify({
+            success: false,
+            error: "Missing required fields: 'number' and 'message' are required"
           }));
           return;
         }
@@ -124,9 +124,9 @@ const server = http.createServer(async (req, res) => {
         // Check if client is ready
         if (!isClientReady) {
           res.writeHead(503, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ 
-            success: false, 
-            error: "WhatsApp client is not ready. Please wait for the bot to connect." 
+          res.end(JSON.stringify({
+            success: false,
+            error: "WhatsApp client is not ready. Please wait for the bot to connect."
           }));
           return;
         }
@@ -154,51 +154,189 @@ const server = http.createServer(async (req, res) => {
           console.log(`API: Sending message to ${formattedNumber}: ${message}`);
           await client.sendMessage(formattedNumber, String(message).trim());
           console.log(`✓ API: Message sent successfully to ${formattedNumber}`);
-          
+
           res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ 
-            success: true, 
+          res.end(JSON.stringify({
+            success: true,
             message: "Message sent successfully",
             number: formattedNumber
           }));
         } catch (sendErr) {
           console.error(`API: Error sending message to ${formattedNumber}:`, sendErr.message);
           res.writeHead(500, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ 
-            success: false, 
-            error: `Failed to send message: ${sendErr.message}` 
+          res.end(JSON.stringify({
+            success: false,
+            error: `Failed to send message: ${sendErr.message}`
           }));
         }
       } catch (parseErr) {
         console.error('Error processing request:', parseErr);
         console.error('Error stack:', parseErr.stack);
         res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ 
-          success: false, 
-          error: `Invalid request: ${parseErr.message}` 
+        res.end(JSON.stringify({
+          success: false,
+          error: `Invalid request: ${parseErr.message}`
         }));
       }
     });
-    
+
     // Set timeout for request (5 minutes)
     req.setTimeout(300000, () => {
       console.error('Request timeout');
       res.writeHead(408, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ 
-        success: false, 
-        error: "Request timeout" 
+      res.end(JSON.stringify({
+        success: false,
+        error: "Request timeout"
       }));
     });
-    
+
+
+    return;
+  }
+
+  // Send image endpoint
+  if (pathname === '/send-image' && req.method === 'POST') {
+    console.log('POST /send-image request received');
+    let body = '';
+    const maxBodySize = 10 * 1024 * 1024; // 10MB limit for images
+
+    req.on('data', chunk => {
+      body += chunk.toString();
+      if (body.length > maxBodySize) {
+        console.error('Request body too large');
+        res.writeHead(413, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          success: false,
+          error: "Payload too large. Max 10MB."
+        }));
+        req.destroy();
+      }
+    });
+
+    req.on('error', (err) => {
+      console.error('Request error:', err);
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        success: false,
+        error: `Request error: ${err.message}`
+      }));
+    });
+
+    req.on('end', async () => {
+      console.log('Request body received, length:', body.length);
+
+      try {
+        let data;
+        if (!body || body.trim() === '') {
+          throw new Error('Empty request body');
+        }
+
+        try {
+          data = JSON.parse(body);
+        } catch (parseErr) {
+          console.error('JSON parse error:', parseErr);
+          throw new Error(`Invalid JSON: ${parseErr.message}`);
+        }
+
+        const { number, message, image, mimetype } = data;
+
+        // Validate input
+        if (!number || !image) {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            success: false,
+            error: "Missing required fields: 'number' and 'image' (base64) are required"
+          }));
+          return;
+        }
+
+        // Check if client is ready
+        if (!isClientReady) {
+          res.writeHead(503, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            success: false,
+            error: "WhatsApp client is not ready. Please wait for the bot to connect."
+          }));
+          return;
+        }
+
+        // Format number for WhatsApp
+        let formattedNumber = String(number).trim();
+        if (!formattedNumber.includes('@')) {
+          formattedNumber = formattedNumber.replace(/\D/g, '');
+          formattedNumber = `${formattedNumber}@s.whatsapp.net`;
+        }
+
+        // Parse mimetype or default
+        const mime = mimetype || 'image/jpeg';
+
+        // Create media object
+        // If the image string has a data URI prefix (data:image/x;base64,), strip it
+        let base64Image = image;
+        if (base64Image.includes(',')) {
+          base64Image = base64Image.split(',')[1];
+        }
+
+        const media = new MessageMedia(mime, base64Image);
+
+        // Mark that we're about to send a message via API
+        const responseKey = `${formattedNumber}_${Date.now()}_${Math.random()}`;
+        botResponseMessages.set(responseKey, {
+          recipientId: formattedNumber,
+          messageText: String(message || '').trim(), // Caption might be empty
+          timestamp: Date.now(),
+          source: 'api'
+        });
+
+        // Send the message
+        try {
+          console.log(`API: Sending image to ${formattedNumber}`);
+          await client.sendMessage(formattedNumber, media, { caption: message || '' });
+          console.log(`✓ API: Image sent successfully to ${formattedNumber}`);
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            success: true,
+            message: "Image sent successfully",
+            number: formattedNumber
+          }));
+        } catch (sendErr) {
+          console.error(`API: Error sending image to ${formattedNumber}:`, sendErr.message);
+          res.writeHead(500, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({
+            success: false,
+            error: `Failed to send image: ${sendErr.message}`
+          }));
+        }
+      } catch (parseErr) {
+        console.error('Error processing request:', parseErr);
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          success: false,
+          error: `Invalid request: ${parseErr.message}`
+        }));
+      }
+    });
+
+    // Set timeout for request (5 minutes)
+    req.setTimeout(300000, () => {
+      console.error('Request timeout');
+      res.writeHead(408, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({
+        success: false,
+        error: "Request timeout"
+      }));
+    });
+
     return;
   }
 
   // 404 for unknown endpoints
   console.log(`404 - Endpoint not found: ${req.method} ${pathname}`);
   res.writeHead(404, { "Content-Type": "application/json" });
-  res.end(JSON.stringify({ 
-    success: false, 
-    error: `Endpoint not found: ${req.method} ${pathname}` 
+  res.end(JSON.stringify({
+    success: false,
+    error: `Endpoint not found: ${req.method} ${pathname}`
   }));
 });
 
@@ -240,11 +378,11 @@ server.listen(PORT, '0.0.0.0', async () => {
     console.log(`API endpoint (network): POST http://${publicIP}:${PORT}/send-message`);
   }
   console.log(`Server is accessible from all network interfaces (0.0.0.0:${PORT})`);
-  
+
   // Start tunnel service if enabled
   const useTunnel = process.env.USE_TUNNEL === 'true' || process.env.USE_TUNNEL === '1';
   const tunnelType = process.env.TUNNEL_TYPE || 'localtunnel'; // 'ngrok' or 'localtunnel'
-  
+
   if (useTunnel) {
     await startTunnel(PORT, tunnelType);
   }
@@ -280,19 +418,19 @@ async function startNgrok(port) {
     }
 
     let publicUrl;
-    
+
     // Try new @ngrok/ngrok package first
     try {
       const ngrok = require('@ngrok/ngrok');
       console.log('Starting ngrok tunnel with @ngrok/ngrok...');
-      
+
       // Set authtoken first
       await ngrok.authtoken(authtoken);
-      
+
       // Start tunnel - try different API methods
       try {
         // Method 1: Using forward with authtoken
-        const listener = await ngrok.forward({ 
+        const listener = await ngrok.forward({
           addr: port,
           authtoken: authtoken
         });
@@ -300,7 +438,7 @@ async function startNgrok(port) {
       } catch (forwardError) {
         // Method 2: Using connect
         try {
-          await ngrok.connect({ 
+          await ngrok.connect({
             addr: port,
             authtoken: authtoken
           });
@@ -313,7 +451,7 @@ async function startNgrok(port) {
           publicUrl = listener.url();
         }
       }
-      
+
     } catch (newNgrokError) {
       // If new package fails, try old ngrok package
       if (newNgrokError.message.includes('Cannot find module')) {
@@ -321,10 +459,10 @@ async function startNgrok(port) {
         try {
           const ngrok = require('ngrok');
           console.log('Starting ngrok tunnel with ngrok package...');
-          
+
           // Configure authtoken for old package
           await ngrok.authtoken(authtoken);
-          
+
           // Start tunnel
           publicUrl = await ngrok.connect(port);
         } catch (oldNgrokError) {
@@ -350,11 +488,11 @@ async function startNgrok(port) {
         throw newNgrokError;
       }
     }
-    
+
     if (!publicUrl) {
       throw new Error('Failed to get ngrok URL');
     }
-    
+
     console.log('\n========================================');
     console.log('✓ NGROK TUNNEL ACTIVE');
     console.log('========================================');
@@ -362,10 +500,10 @@ async function startNgrok(port) {
     console.log(`API endpoint: POST ${publicUrl}/send-message`);
     console.log(`Test endpoint: GET ${publicUrl}/test`);
     console.log('========================================\n');
-    
+
     // Store the URL for reference
     process.env.PUBLIC_URL = publicUrl;
-    
+
     return publicUrl;
   } catch (error) {
     console.error('\n❌ Failed to start ngrok:', error.message);
@@ -382,15 +520,15 @@ async function startNgrok(port) {
 async function startLocaltunnel(port) {
   try {
     const localtunnel = require('localtunnel');
-    
+
     console.log('Starting localtunnel...');
-    const tunnel = await localtunnel({ 
+    const tunnel = await localtunnel({
       port: port,
       subdomain: process.env.LOCALTUNNEL_SUBDOMAIN // Optional: set a custom subdomain
     });
-    
+
     const publicUrl = tunnel.url;
-    
+
     console.log('\n========================================');
     console.log('✓ LOCALTUNNEL ACTIVE');
     console.log('========================================');
@@ -398,16 +536,16 @@ async function startLocaltunnel(port) {
     console.log(`API endpoint: POST ${publicUrl}/send-message`);
     console.log(`Test endpoint: GET ${publicUrl}/test`);
     console.log('========================================\n');
-    
+
     // Store the URL for reference
     process.env.PUBLIC_URL = publicUrl;
-    
+
     // Handle tunnel close
     tunnel.on('close', () => {
       console.log('Tunnel closed. Attempting to reconnect...');
       setTimeout(() => startLocaltunnel(port), 5000);
     });
-    
+
     return publicUrl;
   } catch (error) {
     if (error.message.includes('Cannot find module')) {
@@ -488,15 +626,15 @@ client.on("ready", async () => {
   console.log("Client is ready!");
   console.log("Bot is connected and ready to receive messages");
   isClientReady = true;
-  
+
   // Start broadcast background job
   startBroadcastJob();
-  
+
   // Add stealth script to hide automation (if page is accessible)
   try {
     // Wait a bit for page to be ready
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
+
     if (client.pupPage) {
       const page = await client.pupPage();
       if (page) {
@@ -505,17 +643,17 @@ client.on("ready", async () => {
           Object.defineProperty(navigator, 'webdriver', {
             get: () => false,
           });
-          
+
           // Override plugins
           Object.defineProperty(navigator, 'plugins', {
             get: () => [1, 2, 3, 4, 5],
           });
-          
+
           // Override languages
           Object.defineProperty(navigator, 'languages', {
             get: () => ['en-US', 'en'],
           });
-          
+
           // Mock chrome object
           window.chrome = {
             runtime: {},
@@ -532,10 +670,10 @@ client.on("ready", async () => {
 
 client.on("disconnected", (reason) => {
   console.log("Client disconnected:", reason);
-  
+
   // Reset retry count on disconnect
   retryCount = 0;
-  
+
   // If logged out, need to re-scan QR code
   if (reason === "LOGOUT") {
     console.log("Logged out - WhatsApp may have detected automation");
@@ -547,7 +685,7 @@ client.on("disconnected", (reason) => {
     }, 15000); // Increased wait time
     return;
   }
-  
+
   // For other disconnections, try to reconnect
   console.log("Attempting to reconnect...");
   setTimeout(() => {
@@ -575,26 +713,26 @@ client.on("message_create", async (msg) => {
     const recipientId = msg.to;
     const messageText = msg.body || '';
     const currentTime = Date.now();
-    
+
     // Check if this matches a recent API-sent message or bot response
     let isApiOrBotMessage = false;
     let matchedSource = null;
-    
+
     for (const [key, data] of botResponseMessages.entries()) {
       // Check if recipient matches (handle different formats)
-      const recipientMatches = data.recipientId === recipientId || 
-                               data.recipientId.replace('@s.whatsapp.net', '') === recipientId.replace('@s.whatsapp.net', '') ||
-                               data.recipientId === recipientId.replace('@c.us', '@s.whatsapp.net') ||
-                               data.recipientId.replace('@s.whatsapp.net', '') === recipientId.replace('@c.us', '');
-      
+      const recipientMatches = data.recipientId === recipientId ||
+        data.recipientId.replace('@s.whatsapp.net', '') === recipientId.replace('@s.whatsapp.net', '') ||
+        data.recipientId === recipientId.replace('@c.us', '@s.whatsapp.net') ||
+        data.recipientId.replace('@s.whatsapp.net', '') === recipientId.replace('@c.us', '');
+
       // Check if message text matches (exact match or trimmed match)
-      const messageMatches = data.messageText === messageText || 
-                            data.messageText.trim() === messageText.trim();
-      
+      const messageMatches = data.messageText === messageText ||
+        data.messageText.trim() === messageText.trim();
+
       // Time window: 30 seconds for API messages, 10 seconds for bot responses
       const timeWindow = data.source === 'api' ? 30000 : 10000;
       const timeMatches = (currentTime - data.timestamp) < timeWindow;
-      
+
       if (recipientMatches && messageMatches && timeMatches) {
         isApiOrBotMessage = true;
         matchedSource = data.source;
@@ -603,23 +741,23 @@ client.on("message_create", async (msg) => {
         break;
       }
     }
-    
+
     // Clean up old entries (older than 30 seconds)
     for (const [key, data] of botResponseMessages.entries()) {
       if ((currentTime - data.timestamp) > 30000) {
         botResponseMessages.delete(key);
       }
     }
-    
+
     if (isApiOrBotMessage) {
       console.log(`Skipping outbound API call - this is a ${matchedSource === 'api' ? 'API-sent' : 'bot response'} message`);
       return;
     }
-    
+
     // This is a direct admin message (not from API, not a bot response)
     console.log("Forwarding direct admin message to API");
     try {
-      await axios.post("https://taksh3.app.n8n.cloud/webhook/864fa8a2-2647-4993-9625-7e9fb824ee55", {
+      await axios.post("http://72.60.97.177:5678/webhook/admin-message", {
         msg: msg.body,
         from: stripJid(msg.from),
         to: stripJid(msg.to),
@@ -639,7 +777,7 @@ client.on("message_create", async (msg) => {
     return;
   } else {
     console.log("Personal message");
-    
+
     // Forward all user messages to the API
     try {
       await axios.post("http://72.60.97.177:5678/webhook/custom_wa_bot", {
@@ -666,17 +804,17 @@ const initializeClient = async () => {
     console.log("Already initializing, skipping...");
     return;
   }
-  
+
   isInitializing = true;
   try {
     console.log(`Initializing WhatsApp client (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
     console.log("This may take a few seconds. Waiting for WhatsApp Web to load...");
-    
+
     // Add a small delay before initialization to ensure previous session is cleaned up
     if (retryCount > 0) {
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
-    
+
     console.log("Starting WhatsApp Web client initialization...");
     await client.initialize();
     retryCount = 0; // Reset on success
@@ -687,20 +825,20 @@ const initializeClient = async () => {
     retryCount++;
     const errorMsg = error?.message || String(error);
     console.error("Failed to initialize client:", errorMsg);
-    
+
     // Handle specific error types
     if (errorMsg.includes("VERSION") || errorMsg.includes("Execution context")) {
       console.error("Version detection error - WhatsApp Web may not be fully loaded yet");
       console.error("This often happens on cloud platforms. Will retry with longer delay...");
     }
-    
+
     if (retryCount >= MAX_RETRIES) {
       console.error("Max retries reached. The bot will stay stopped.");
       console.error("This is often due to WhatsApp detecting automation on cloud platforms.");
       console.error("Consider using a VPS or upgrading to Render paid plan for better compatibility.");
       return; // Don't exit, let the HTTP server keep running
     }
-    
+
     // Longer wait time for version errors
     const baseWaitTime = errorMsg.includes("VERSION") ? 30000 : 15000;
     const waitTime = Math.min(baseWaitTime * retryCount, 60000); // Max 60s
@@ -715,7 +853,7 @@ const initializeClient = async () => {
 process.on('unhandledRejection', (error) => {
   const errorMsg = error?.message || String(error);
   console.error('Unhandled promise rejection:', errorMsg);
-  
+
   // If it's a version error, try to reinitialize after a delay
   if (errorMsg.includes('VERSION') || errorMsg.includes('Execution context')) {
     console.log('Version detection error detected. Will retry initialization...');
@@ -751,7 +889,7 @@ const fetchAllWhatsAppContacts = async () => {
     }
 
     console.log("Fetching all WhatsApp contacts...");
-    
+
     // Try method 1: getContacts() - may fail on some WhatsApp Web versions
     let contacts = [];
     try {
@@ -763,15 +901,15 @@ const fetchAllWhatsAppContacts = async () => {
         const chats = await client.getChats();
         // Extract unique contacts from chats (excluding groups and self)
         const contactMap = new Map();
-        
+
         for (const chat of chats) {
           // Skip groups
           if (chat.isGroup) continue;
-          
+
           const contactId = chat.id._serialized;
           // Skip broadcast lists and self
           if (contactId.includes('@broadcast') || contactId === client.info.wid._serialized) continue;
-          
+
           // Add to map if not already present
           if (!contactMap.has(contactId)) {
             contactMap.set(contactId, {
@@ -782,7 +920,7 @@ const fetchAllWhatsAppContacts = async () => {
             });
           }
         }
-        
+
         contacts = Array.from(contactMap.values());
         console.log(`Fetched ${contacts.length} contacts from chats`);
       } catch (chatError) {
@@ -790,14 +928,14 @@ const fetchAllWhatsAppContacts = async () => {
         throw chatError;
       }
     }
-    
+
     // Filter out groups and only get individual contacts
     const individualContacts = contacts.filter(contact => {
       const contactId = contact.id?._serialized || contact.id || '';
       // Exclude groups (they have @g.us in id)
-      return !contactId.includes('@g.us') && 
-             !contactId.includes('@broadcast') &&
-             contactId !== client.info.wid._serialized; // Exclude self
+      return !contactId.includes('@g.us') &&
+        !contactId.includes('@broadcast') &&
+        contactId !== client.info.wid._serialized; // Exclude self
     });
 
     console.log(`Found ${individualContacts.length} individual contacts`);
@@ -822,15 +960,15 @@ const fetchAllWhatsAppContacts = async () => {
 const sendBroadcastMessage = async (messageId, message) => {
   try {
     console.log(`Starting broadcast for message ID: ${messageId}`);
-    
+
     // Fetch all WhatsApp contacts
     const contacts = await fetchAllWhatsAppContacts();
-    
+
     if (contacts.length === 0) {
       console.log("No contacts found to send broadcast");
       await supabase
         .from('broadcast_messages')
-        .update({ 
+        .update({
           status: 'failed',
           error_message: 'No contacts found',
           completed_at: new Date().toISOString()
@@ -850,7 +988,7 @@ const sendBroadcastMessage = async (messageId, message) => {
         await client.sendMessage(contact.id, message);
         sentCount++;
         console.log(`✓ Sent to ${contact.name}`);
-        
+
         // Add delay between messages (except for the last one)
         if (i < contacts.length - 1) {
           await delay();
@@ -865,7 +1003,7 @@ const sendBroadcastMessage = async (messageId, message) => {
     console.log(`Broadcast completed. Sent to ${sentCount} out of ${contacts.length} contacts`);
     await supabase
       .from('broadcast_messages')
-      .update({ 
+      .update({
         status: 'completed',
         sent_count: sentCount,
         completed_at: new Date().toISOString()
@@ -877,7 +1015,7 @@ const sendBroadcastMessage = async (messageId, message) => {
     // Update message status to failed
     await supabase
       .from('broadcast_messages')
-      .update({ 
+      .update({
         status: 'failed',
         error_message: error.message,
         completed_at: new Date().toISOString()
@@ -919,7 +1057,7 @@ const processPendingBroadcasts = async () => {
     // Immediately change status to processing
     const { error: updateError } = await supabase
       .from('broadcast_messages')
-      .update({ 
+      .update({
         status: 'processing',
         started_at: new Date().toISOString()
       })
@@ -945,10 +1083,10 @@ const processPendingBroadcasts = async () => {
  */
 const startBroadcastJob = () => {
   console.log("Starting broadcast background job (runs every 1 minute)");
-  
+
   // Run immediately on start
   processPendingBroadcasts();
-  
+
   // Then run every 1 minute (60000 ms)
   setInterval(() => {
     processPendingBroadcasts();

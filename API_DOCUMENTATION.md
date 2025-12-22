@@ -152,7 +152,58 @@ Content-Type: application/json
 }
 ```
 
+
 ---
+
+### 3. Send Image Message
+
+Send an image with a caption to a specified phone number.
+
+**Endpoint:** `POST /send-image`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "number": "919313309319",
+  "message": "Here is an image for you!",
+  "image": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "mimetype": "image/png"
+}
+```
+
+**Parameters:**
+- `number` (required, string): The phone number to send the image to.
+- `message` (optional, string): The caption for the image.
+- `image` (required, string): The Base64 encoded, string representation of the image.
+- `mimetype` (optional, string): The MIME type of the image. Defaults to `image/jpeg`.
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Image sent successfully",
+  "number": "919313309319@s.whatsapp.net"
+}
+```
+
+**Error Responses:**
+
+**413 Payload Too Large** - Image too big (Max 10MB):
+```json
+{
+  "success": false,
+  "error": "Payload too large. Max 10MB."
+}
+```
+
+Plus standard error responses (400, 503, 500) as above.
+
+
 
 ## Examples
 
