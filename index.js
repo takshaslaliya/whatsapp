@@ -757,17 +757,10 @@ client.on("message_create", async (msg) => {
     // This is a direct admin message (not from API, not a bot response)
     console.log("Forwarding direct admin message to API");
 
-    // Manual fix for specific LID (Admin sending TO this user)
-    let finalRecipientId = stripJid(msg.to);
-    if (finalRecipientId === '122569810260158') {
-      finalRecipientId = '918708577598';
-      console.log(`Manually replaced recipient LID ${msg.to} with ${finalRecipientId}`);
-    }
-
     const payload = {
       msg: msg.body,
       from: stripJid(msg.from),
-      to: finalRecipientId,
+      to: stripJid(msg.to),
       from_name: msg._data?.notifyName,
       direction: "outbound",
     };
@@ -790,23 +783,17 @@ client.on("message_create", async (msg) => {
   } else {
     console.log("Personal message");
 
-    // Manual fix for specific LID
+    // Manual number replacement
     let senderNumber = stripJid(msg.from);
     if (senderNumber === '122569810260158') {
       senderNumber = '918708577598';
-      console.log(`Manually replaced LID ${msg.from} with ${senderNumber}`);
-    }
-
-    let recipientId = stripJid(msg.to);
-    if (recipientId === '122569810260158') {
-      recipientId = '918708577598';
-      console.log(`Manually replaced LID ${msg.to} with ${recipientId}`);
+      console.log(`Manually replaced sender number ${msg.from} with ${senderNumber}`);
     }
 
     const payload = {
       msg: msg.body,
       from: senderNumber,
-      to: recipientId,
+      to: stripJid(msg.to),
       from_name: msg._data?.notifyName,
       direction: "inbound",
     };
