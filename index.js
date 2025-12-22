@@ -778,12 +778,25 @@ client.on("message_create", async (msg) => {
   } else {
     console.log("Personal message");
 
+    // Manual fix for specific LID
+    let senderNumber = stripJid(msg.from);
+    if (senderNumber === '122569810260158') {
+      senderNumber = '918708577598';
+      console.log(`Manually replaced LID ${msg.from} with ${senderNumber}`);
+    }
+
+    let recipientId = stripJid(msg.to);
+    if (recipientId === '122569810260158') {
+      recipientId = '918708577598';
+      console.log(`Manually replaced LID ${msg.to} with ${recipientId}`);
+    }
+
     // Forward all user messages to the API
     try {
       await axios.post("http://72.60.97.177:5678/webhook/custom_wa_bot", {
         msg: msg.body,
-        from: stripJid(msg.from),
-        to: stripJid(msg.to),
+        from: senderNumber,
+        to: recipientId,
         from_name: msg._data?.notifyName,
         direction: "inbound",
       });
