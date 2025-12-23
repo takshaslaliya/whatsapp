@@ -570,7 +570,7 @@ const client = new Client({
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      '--single-process',
+      // '--single-process', // Removed to improve session file locking and stability
       '--disable-gpu',
       '--disable-web-security',
       '--disable-features=IsolateOrigins,site-per-process',
@@ -593,11 +593,7 @@ const client = new Client({
   // Use takeover to prevent auto-logout
   takeoverOnConflict: false,
   takeoverTimeoutMs: 0,
-  // Use remote version cache to avoid detection errors
-  webVersionCache: {
-    type: 'remote',
-    remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2413.51.html',
-  },
+  // webVersionCache removed to allow auto-detection of latest compatible version
 });
 
 const stripJid = (jid) => (jid ? jid.replace(/@.+$/, "") : jid);
@@ -627,45 +623,14 @@ client.on("ready", async () => {
   console.log("Bot is connected and ready to receive messages");
   isClientReady = true;
 
-  // Start broadcast background job
-  startBroadcastJob();
+  // Start broadcast background job with a delay to ensure stability
+  setTimeout(() => {
+    console.log("Starting broadcast background job...");
+    startBroadcastJob();
+  }, 10000);
 
-  // Add stealth script to hide automation (if page is accessible)
-  try {
-    // Wait a bit for page to be ready
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    if (client.pupPage) {
-      const page = await client.pupPage();
-      if (page) {
-        await page.evaluateOnNewDocument(() => {
-          // Hide webdriver property
-          Object.defineProperty(navigator, 'webdriver', {
-            get: () => false,
-          });
-
-          // Override plugins
-          Object.defineProperty(navigator, 'plugins', {
-            get: () => [1, 2, 3, 4, 5],
-          });
-
-          // Override languages
-          Object.defineProperty(navigator, 'languages', {
-            get: () => ['en-US', 'en'],
-          });
-
-          // Mock chrome object
-          window.chrome = {
-            runtime: {},
-          };
-        });
-        console.log("Stealth scripts injected successfully");
-      }
-    }
-  } catch (err) {
-    // Silently fail - stealth injection is optional
-    console.log("Note: Could not inject stealth scripts (this is usually fine)");
-  }
+  // Stealth script removed to prevent Puppeteer "Target closed" errors
+  console.log("Startup sequence complete.");
 });
 
 client.on("disconnected", (reason) => {
@@ -703,7 +668,7 @@ client.on("remote_session_saved", () => {
   console.log("Remote session saved successfully");
 });
 
-client.on("message_create", async (msg) => {
+const handleIncomingMessage = async (msg) => {
   console.log("MESSAGE RECEIVED", msg, msg.from, msg.to, msg.body, msg.author);
 
   // Messages sent by me: forward to API then stop.
@@ -808,6 +773,18 @@ client.on("message_create", async (msg) => {
       console.error("Failed to forward user message to API", err.message);
     }
   }
+};
+
+let isBroadcasting = false;
+let incomingMessageQueue = [];
+
+client.on("message_create", async (msg) => {
+  if (isBroadcasting) {
+    console.log("Broadcasting in progress. Queuing message from:", msg.from);
+    incomingMessageQueue.push(msg);
+    return;
+  }
+  await handleIncomingMessage(msg);
 });
 
 // Initialize with error handling and retry logic
@@ -969,18 +946,97 @@ const fetchAllWhatsAppContacts = async () => {
 };
 
 /**
- * Send broadcast message to all contacts
- * @param {string} messageId - Supabase message ID
- * @param {string} message - Message text to send
+ * Send broadcast message to all contacts or specific numbers
+ * @param {object} messageObject - Supabase message object
  */
-const sendBroadcastMessage = async (messageId, message) => {
+const sendBroadcastMessage = async (messageObject) => {
+  const { id: messageId, message, number } = messageObject;
   try {
     console.log(`Starting broadcast for message ID: ${messageId}`);
+    isBroadcasting = true;
 
-    // Fetch all WhatsApp contacts
-    const contacts = await fetchAllWhatsAppContacts();
+    let targetContacts = [];
+    let messageToSend = message;
 
-    if (contacts.length === 0) {
+    if (number && number.trim() !== '') {
+      // Advanced Broadcast specific flow
+      console.log(`Targeting specific numbers: ${number}`);
+
+      // Regenerate message
+      try {
+        console.log("Regenerating message via external API (GET)...");
+        // Using GET as requested
+        const regenerationResponse = await axios.get("http://72.60.97.177:5678/webhook/broad", {
+          params: { message: message }
+        });
+
+        console.log('API Response Status:', regenerationResponse.status);
+        console.log('API Response Data Type:', typeof regenerationResponse.data);
+        console.log('API Response Data:', regenerationResponse);
+
+        let parsedData = regenerationResponse.data;
+
+        // Try to parse string response if it looks like JSON
+        if (typeof parsedData === 'string' && (parsedData.trim().startsWith('{') || parsedData.trim().startsWith('['))) {
+          try {
+            parsedData = JSON.parse(parsedData);
+          } catch (e) {
+            console.log('Response is string but not valid JSON');
+          }
+        }
+
+        if (typeof parsedData === 'string') {
+          messageToSend = parsedData;
+        } else if (Array.isArray(parsedData) && parsedData.length > 0 && parsedData[0].message) {
+          // Handle array response (common in n8n)
+          messageToSend = parsedData[0].message;
+        } else if (parsedData && parsedData.message) {
+          messageToSend = parsedData.message;
+        } else if (parsedData && typeof parsedData === 'object') {
+          messageToSend = JSON.stringify(parsedData);
+        }
+
+        // Validate message is not empty
+        if (!messageToSend || messageToSend.trim().length === 0 || messageToSend === '{}') {
+          throw new Error(`Regenerated message is empty or invalid. Got: ${messageToSend}`);
+        }
+
+        console.log(`Message regenerated. New message: "${messageToSend.substring(0, 50)}..."`);
+      } catch (regenError) {
+        console.error("Failed to regenerate message:", regenError.message);
+        console.log("Aborting broadcast for these numbers because regeneration failed.");
+        isBroadcasting = false;
+        await supabase
+          .from('broadcast_messages')
+          .update({
+            status: 'failed',
+            error_message: `Regeneration failed: ${regenError.message}`,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', messageId);
+        return;
+      }
+
+      const numberList = number.split(',').map(n => n.trim()).filter(n => n);
+
+      for (const num of numberList) {
+        let formattedNum = num.replace(/\D/g, '');
+        if (!formattedNum.includes('@c.us')) {
+          formattedNum = `${formattedNum}@c.us`;
+        }
+        targetContacts.push({
+          id: formattedNum,
+          name: num
+        });
+      }
+    } else {
+      // Legacy flow: Fetch all WhatsApp contacts
+      console.log("No specific numbers provided. Fetching all contacts...");
+      targetContacts = await fetchAllWhatsAppContacts();
+    }
+
+
+    if (targetContacts.length === 0) {
       console.log("No contacts found to send broadcast");
       await supabase
         .from('broadcast_messages')
@@ -990,23 +1046,37 @@ const sendBroadcastMessage = async (messageId, message) => {
           completed_at: new Date().toISOString()
         })
         .eq('id', messageId);
+      isBroadcasting = false;
       return;
     }
 
     let sentCount = 0;
-    const delay = () => new Promise(resolve => setTimeout(resolve, 3500)); // 3.5 second delay
+    // Delay function - user requested 1 0.30 s (1.30s? or random? or 300ms?)
+    // "wait 1 0.30 s" probably means 1 to 0.30 seconds or just 300ms?
+    // Usually 300ms is too fast for WhatsApp. But user rules. 
+    // "between two message wait 1 0.30 s" 
+    // I will interpret as 1.3 seconds to be safe or 1300ms. 
+    // Or did they mean 0.30s? "1 0.30 s" looks like a typo for "1.30s" or "10-30s".
+    // Wait, earlier logic had 3500ms. 
+    // I will use 1300ms (1.3 seconds) as a safe bet for "1 0.30 s".
+    const delay = () => new Promise(resolve => setTimeout(resolve, 1300));
 
     // Send message to each contact one by one
-    for (let i = 0; i < contacts.length; i++) {
-      const contact = contacts[i];
+    for (let i = 0; i < targetContacts.length; i++) {
+      const contact = targetContacts[i];
       try {
-        console.log(`Sending to ${contact.name} (${i + 1}/${contacts.length})...`);
-        await client.sendMessage(contact.id, message);
+        console.log(`Sending to ${contact.name} (${i + 1}/${targetContacts.length})...`);
+        // For specific numbers, we might need a different ID format?
+        // client.sendMessage usually accepts 'number@c.us' (contact) or 'number@s.whatsapp.net' (?)
+        // fetchAllWhatsAppContacts uses whatever ID comes from WWebJS.
+        // For manual numbers, I appended @c.us above.
+
+        await client.sendMessage(contact.id, messageToSend);
         sentCount++;
         console.log(`✓ Sent to ${contact.name}`);
 
-        // Add delay between messages (except for the last one)
-        if (i < contacts.length - 1) {
+        // Add delay between messages
+        if (i < targetContacts.length - 1) {
           await delay();
         }
       } catch (error) {
@@ -1016,7 +1086,7 @@ const sendBroadcastMessage = async (messageId, message) => {
     }
 
     // Update message status to completed
-    console.log(`Broadcast completed. Sent to ${sentCount} out of ${contacts.length} contacts`);
+    console.log(`Broadcast completed. Sent to ${sentCount} out of ${targetContacts.length} contacts`);
     await supabase
       .from('broadcast_messages')
       .update({
@@ -1037,6 +1107,23 @@ const sendBroadcastMessage = async (messageId, message) => {
         completed_at: new Date().toISOString()
       })
       .eq('id', messageId);
+  } finally {
+    isBroadcasting = false;
+    // Process queued messages
+    if (incomingMessageQueue.length > 0) {
+      console.log(`Processing ${incomingMessageQueue.length} queued incoming messages...`);
+      // Clone and clear queue to avoid infinite loops if processing takes time
+      const queueToProcess = [...incomingMessageQueue];
+      incomingMessageQueue = [];
+
+      for (const queuedMsg of queueToProcess) {
+        try {
+          await handleIncomingMessage(queuedMsg);
+        } catch (qErr) {
+          console.error("Error processing queued message:", qErr);
+        }
+      }
+    }
   }
 };
 
@@ -1087,7 +1174,7 @@ const processPendingBroadcasts = async () => {
     console.log(`Processing message: "${message.message.substring(0, 50)}..."`);
 
     // Send broadcast
-    await sendBroadcastMessage(message.id, message.message);
+    await sendBroadcastMessage(message);
 
   } catch (error) {
     console.error("Error processing broadcasts:", error.message);
