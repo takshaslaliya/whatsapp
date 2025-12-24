@@ -570,11 +570,11 @@ const client = new Client({
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      // '--single-process', // Removed to improve session file locking and stability
       '--disable-gpu',
       '--disable-web-security',
       '--disable-features=IsolateOrigins,site-per-process',
-      '--user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      // Use Windows User Agent to avoid Linux server detection
+      '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       '--window-size=1920,1080',
       '--start-maximized',
       '--disable-blink-features=AutomationControlled',
@@ -593,7 +593,12 @@ const client = new Client({
   // Use takeover to prevent auto-logout
   takeoverOnConflict: false,
   takeoverTimeoutMs: 0,
-  // webVersionCache removed to allow auto-detection of latest compatible version
+  // Use a stable version of WhatsApp Web to prevent automation detection loops
+  webVersionCache: {
+    type: "remote",
+    remotePath:
+      "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
+  },
 });
 
 const stripJid = (jid) => (jid ? jid.replace(/@.+$/, "") : jid);
